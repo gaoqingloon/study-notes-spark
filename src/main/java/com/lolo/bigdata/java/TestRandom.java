@@ -23,5 +23,16 @@ public class TestRandom {
         for (int i = 0; i < 10; i++) {
             System.out.print(random1.nextInt(7) + " ");
         }
+
+
+        // static final Random randomNumberGenerator = new Random();
+        //  静态，只有一份
+        /*Math.random()
+        Math.random()
+        Math.random()*/
+
+        /*new Random().nextDouble()
+        new Random().nextDouble()
+        new Random().nextDouble()*/
     }
 }
