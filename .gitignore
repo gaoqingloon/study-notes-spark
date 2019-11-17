@@ -5,9 +5,13 @@
 # IntelliJ project files
 .idea
 *.iml
-out
 gen
 
 # JAVA
 target
 pom.xml
+
+# SPARK
+output*
+
+
