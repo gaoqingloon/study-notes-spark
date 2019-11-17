@@ -8,7 +8,7 @@ import org.apache.spark.{SparkConf, SparkContext}
   * Description: 统计出每一个省份广告被点击次数的TOP3
   * version: 1.0
   */
-object AdClicksPerProvince1 {
+object Case_AdClicksPerProvince1 {
 
     def main(args: Array[String]): Unit = {
 

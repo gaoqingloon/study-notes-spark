@@ -1,0 +1,7 @@
+hadoop,hive,spark
+hbase,flume,sqoop
+oozie,azkaban,kafka
+kylin,cdh
+hadoop,hadoop,spark,kafka
+hive,spark,spark,hbase
+hbase,hive,hive

@@ -57,7 +57,7 @@ object Spark20_PartitionPy {
         println() //(1,aaa), (2,bbb), (3,ccc), (4,ddd)//3个分区但只有一个分区有数据
 
         // 也可以这样测试，3个文件，只有一个文件有数据
-        myPartitionByRDD.saveAsTextFile("out")
+        myPartitionByRDD.saveAsTextFile("output")
 
         sc.stop()
     }
@@ -73,6 +73,8 @@ class MyPartitioner(partitions: Int) extends Partitioner {
 
     // 根据分区个数书写分区规则
     override def getPartition(key: Any) = {
-        1
+        //1
+        val cKey: String = key.toString
+        cKey.substring(cKey.length - 1).toInt % partitions
     }
 }
