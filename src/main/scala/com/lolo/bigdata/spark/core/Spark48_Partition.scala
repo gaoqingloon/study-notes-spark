@@ -13,7 +13,7 @@ object Spark48_Partition {
 
     def main(args: Array[String]): Unit = {
 
-        val conf = new SparkConf().setMaster("local[*]").setAppName("checkpoint")
+        val conf = new SparkConf().setMaster("local[*]").setAppName("partition")
         val sc = new SparkContext(conf)
 
         val pairs = sc.parallelize(List((1, 1), (2, 2), (3, 3)))
