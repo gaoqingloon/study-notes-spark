@@ -20,8 +20,8 @@ object SparkSQL04_UDF {
             .getOrCreate()
 
 
-        val df: DataFrame = spark.read.json("data/user.json")
-        df.show()
+        val userDF: DataFrame = spark.read.json("data/user.json")
+        userDF.show()
         /*
         +---+------+
         |age|  name|
@@ -32,11 +32,17 @@ object SparkSQL04_UDF {
         +---+------+
          */
 
+        // 自定义udf函数
+        val addA = (x: String) => {
+            "A: " + x
+        }
+
         // 1. 注册udf函数
         spark.udf.register("addName", (x: String) => "Name:" + x)
+        spark.udf.register("addA", addA)
 
         // 2. 使用udf函数查询
-        df.createOrReplaceTempView("user")
+        userDF.createOrReplaceTempView("user")
         spark.sql("select addName(name),age from user").show()
         /*
         +-----------------+---+

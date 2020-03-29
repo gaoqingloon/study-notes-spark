@@ -19,6 +19,7 @@ object SparkStreaming07_Transform {
 
         // 实时数据分析环境对象，采集周期：以指定的时间为周期采集实时数据
         val ssc: StreamingContext = new StreamingContext(conf, Seconds(3))
+        ssc.sparkContext.setLogLevel("error")
 
         // 1. 从指定的端口中采集数据
         val socketLineDStream: ReceiverInputDStream[String] =

@@ -1,8 +1,10 @@
 package com.lolo.bigdata.spark.streaming
 
+import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord}
+import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
-import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
-import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.spark.streaming.dstream.{DStream, InputDStream}
+import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, LocationStrategies}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 /**
@@ -21,17 +23,31 @@ object SparkStreaming06_Window {
         // 2. sparkStreaming中的窗口
         val conf = new SparkConf().setMaster("local[*]").setAppName("window")
         val ssc: StreamingContext = new StreamingContext(conf, Seconds(3))
+        ssc.sparkContext.setLogLevel("error")
 
         // 保存数据的状态，需要设定检查点的路径
         ssc.sparkContext.setCheckpointDir("checkpoint")
 
-        // 从kafka中采集数据
-        val kafkaDStream: ReceiverInputDStream[(String, String)] = KafkaUtils.createStream(
-            ssc,
-            "hadoop102:2181,hadoop103:2181,hadoop104:2181", //zookeeper
-            "gordon", //groupId
-            Map("gordon" -> 3) //topics
+        //创建连接kafka的参数
+        val brokeList = "hadoop102:9092,hadoop103:9092,hadoop104:9092"
+        val consumerGroup = "test"
+        val kafkaParams: Map[String, Object] = Map[String, Object](
+            ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokeList,
+            ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+            ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+            ConsumerConfig.GROUP_ID_CONFIG -> consumerGroup,
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> "latest", //earliest、latest
+            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> (true: java.lang.Boolean) //默认为true
         )
+        val topics = Array("testTopic")
+        // 从kafka中采集数据
+        val stream: InputDStream[ConsumerRecord[String, String]] = KafkaUtils.createDirectStream(
+            ssc,
+            LocationStrategies.PreferConsistent,
+            ConsumerStrategies.Subscribe[String, String](topics, kafkaParams)
+        )
+        val kafkaDStream: DStream[(String, String)] = stream.map(x => (x.key(), x.value()))
+
 
         // 窗口大小应该为采集周期的整数倍，窗口滑动的步长也应该为采集周期的整数倍
         // windowDuration: Duration, slideDuration: Duration

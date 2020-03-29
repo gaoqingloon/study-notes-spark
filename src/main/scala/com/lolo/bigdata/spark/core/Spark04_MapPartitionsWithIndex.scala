@@ -30,6 +30,7 @@ object Spark04_MapPartitionsWithIndex {
         val tupleRDD: RDD[(Int, String)] = listRDD.mapPartitionsWithIndex {
             case (num, datas) =>
                 datas.map((_, "分区号: " + num))
+                //datas.map(x => (x, "分区号: " + num))
         }
         /*
         (1,分区号: 0)

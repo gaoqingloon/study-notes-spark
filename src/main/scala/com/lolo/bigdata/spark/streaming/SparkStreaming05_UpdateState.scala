@@ -1,8 +1,10 @@
 package com.lolo.bigdata.spark.streaming
 
-import org.apache.spark.SparkConf
-import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
-import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord}
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.{HashPartitioner, SparkConf}
+import org.apache.spark.streaming.dstream.{DStream, InputDStream}
+import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, LocationStrategies}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 /**
@@ -13,6 +15,10 @@ import org.apache.spark.streaming.{Seconds, StreamingContext}
   */
 object SparkStreaming05_UpdateState {
 
+    /**
+      * 该程序存在的问题，当程序结束后再启动，不会记住之前消费数据的位置
+      * 通常把offset累加到redis中
+      */
     def main(args: Array[String]): Unit = {
 
         val conf = new SparkConf().setMaster("local[*]").setAppName("updateState")
@@ -20,24 +26,37 @@ object SparkStreaming05_UpdateState {
 
         // 保存数据的状态，需要设定检查点的路径
         ssc.sparkContext.setCheckpointDir("checkpoint")
-
-
-        // 1. 从指定的端口中采集数据
-        /*val socketLineDStream: ReceiverInputDStream[String] =
-            ssc.socketTextStream("hadoop102", 9999)*/
-        // 1. 从指定文件夹中采集数据
-        //val fileDStream: DStream[String] = ssc.textFileStream("spark-warehouse")
-        // 1. 自定义Receiver
-        /*val receiverDStream: ReceiverInputDStream[String] =
-            ssc.receiverStream(new MyReceiver("hadoop102", 9999))*/
+        ssc.sparkContext.setLogLevel("error")
 
         // 从kafka中采集数据
-        val kafkaDStream: ReceiverInputDStream[(String, String)] = KafkaUtils.createStream(
+        /*val kafkaDStream: ReceiverInputDStream[(String, String)] = KafkaUtils.createStream(
             ssc,
             "hadoop102:2181,hadoop103:2181,hadoop104:2181",
             "gordon",
             Map("gordon" -> 3)
+        )*/
+
+        //创建连接kafka的参数
+        val brokeList = "hadoop102:9092,hadoop103:9092,hadoop104:9092"
+        val consumerGroup = "test"
+        val kafkaParams: Map[String, Object] = Map[String, Object](
+            ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> brokeList,
+            ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+            ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+            ConsumerConfig.GROUP_ID_CONFIG -> consumerGroup,
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> "latest", //earliest、latest
+            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> (true: java.lang.Boolean) //默认为true
         )
+        val topics = Array("testTopic")
+        // 从kafka中采集数据
+        val stream: InputDStream[ConsumerRecord[String, String]] = KafkaUtils.createDirectStream(
+            ssc,
+            LocationStrategies.PreferConsistent,
+            ConsumerStrategies.Subscribe[String, String](topics, kafkaParams)
+        )
+        val kafkaDStream: DStream[(String, String)] = stream.map(x => (x.key(), x.value()))
+
+
 
         // 将采集的数据进行分解（扁平化）
         val wordDStream: DStream[String] = kafkaDStream.flatMap(t => t._2.split(" "))
@@ -45,7 +64,7 @@ object SparkStreaming05_UpdateState {
         // 将数据进行结构的转换方便统计分析
         val mapDStream: DStream[(String, Int)] = wordDStream.map((_, 1))
 
-        // 将转换结构后的数据进行聚合处理
+        // 将转换结构后的数据进行聚合处理（有状态）
         //val wordToSumDStream: DStream[(String, Int)] = mapDStream.reduceByKey(_ + _)
         val stateDStream: DStream[(String, Int)] = mapDStream.updateStateByKey {
             case (seq, buffer) => {
@@ -53,6 +72,13 @@ object SparkStreaming05_UpdateState {
                 Option(sum)
             }
         }
+
+        /*val stateDStream: DStream[(String, Int)] = mapDStream.updateStateByKey(
+            updateFunc,
+            new HashPartitioner(ssc.sparkContext.defaultParallelism),
+            rememberPartitioner = true
+        )*/
+
 
         // 将结果打印出来
         stateDStream.print()
@@ -65,5 +91,28 @@ object SparkStreaming05_UpdateState {
         ssc.start()
         // Driver等待采集器执行
         ssc.awaitTermination()
+    }
+
+    /**
+      * 创建匿名函数 val func: x => y = x1 => y1
+      * 第一个参数：聚合的key，就是单词
+      * 第二个参数：当前批次产生批次该单词在每一个分区出现的次数
+      * 第三个参数：初始值或累加的中间结果
+      */
+    val updateFunc: Iterator[(String, Seq[Int], Option[Int])] => Iterator[(String, Int)] = {
+        data => {
+            // data.map(t => (t._1, t._2.sum + t._3.getOrElse(0)))
+            data.map {
+                case (x, y, z) => (x, y.sum + z.getOrElse(0))
+            }
+        }
+    }
+
+    // 传参需要使用匿名函数，只是一段逻辑，不能使用这种函数
+    def updateFunc1(data: Iterator[(String, Seq[Int], Option[Int])]): Iterator[(String, Int)] = {
+        data.map {
+            // data.map(t => (t._1, t._2.sum + t._3.getOrElse(0)))
+            case (x, y, z) => (x, y.sum + z.getOrElse(0))
+        }
     }
 }

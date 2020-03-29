@@ -1,6 +1,7 @@
 package com.lolo.bigdata.spark.core
 
 import org.apache.spark.rdd.{JdbcRDD, RDD}
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
@@ -112,5 +113,30 @@ object Spark50_MySQL {
 
             connection.close()
         })
+    }
+
+    /**
+      * DataFrame数据写入到MySQL数据库
+      */
+    def save2MySQL(): Unit = {
+        // 创建SparkSession（包含SparkContext）
+        val sparkConf = new SparkConf().setAppName("session").setMaster("local[*]")
+        val spark = SparkSession.builder().config(sparkConf).enableHiveSupport().getOrCreate()
+        spark.sparkContext.setLogLevel("ERROR")
+
+        val sc = new SparkContext(sparkConf)
+
+        val dataRDD: RDD[(String, Int)] =
+            sc.makeRDD(List(("gordon", 25), ("lnn", 18), ("tony", 21)))
+
+        import spark.implicits._
+        dataRDD.toDF().write
+            .format("jdbc")
+            .option("url", "jdbc:mysql:///rdd")
+            .option("user", "root")
+            .option("password", "123456")
+            .option("dbtable", "df2sql")
+            .mode(SaveMode.Overwrite)
+            .save()
     }
 }

@@ -33,6 +33,7 @@ object Spark10_Distinct {
         // 所以可以改变默认的分区数量
         // numPartitions: Int
         val distinctRDD: RDD[Int] = listRDD.distinct(2) //2个分区
+        //map(x => (x, null)).reduceByKey((x, y) => x, numPartitions).map(_._1)
 
         //distinctRDD.collect().foreach(println)
         distinctRDD.saveAsTextFile("output")
